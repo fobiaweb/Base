@@ -8,6 +8,18 @@
 
 namespace Fobia\Base;
 
+use \Fobia\Base\Utils;
+use \Fobia\Base\Fobia;
+
+if (!class_exists('Log')) {
+    class Log {
+        public static function __callStatic($name, $arguments)
+        {
+
+        }
+     }
+}
+
 /**
  * Application class
  *
@@ -25,7 +37,7 @@ class Application extends \Slim\App
     // protected static $instance = null;
 
     /**
-     * @return \Fobia\Application
+     * @return \Fobia\Base\Application
      */
     public static function getInstance($name = null)
     {
@@ -70,8 +82,8 @@ class Application extends \Slim\App
         foreach ($dirs as $dir) {
             $f = $dir . "/config.yml";
             if (file_exists($f)) {
-                $defaultSettings = \Fobia\Utils::loadConfigCache($f);
-                \Fobia\Log::debug("Configuration read from", array(realpath($f)));
+                $defaultSettings = Utils::loadConfigCache($f);
+                Log::debug("Configuration read from", array(realpath($f)));
                 break;
             }
         }
@@ -82,14 +94,14 @@ class Application extends \Slim\App
         if (is_array($userSettings)) {
             $defaultSettings = array_replace($defaultSettings, $userSettings);
         }
-        
+
         if (is_array($defaultSettings['import'])) {
             foreach ($defaultSettings['import'] as $file) {
                 $file     = $configDir . '/' . $file;
                 $settings = \Fobia\Utils::loadConfig($file);
                 if ($settings) {
                     $defaultSettings = array_merge($defaultSettings, $settings);
-                    \Fobia\Log::debug("Configuration import",
+                    Log::debug("Configuration import",
                                       array(realpath($file)));
                 }
             }
@@ -115,14 +127,14 @@ class Application extends \Slim\App
             if (is_array($autoload)) {
                 foreach (@$autoload as $cfg => $file) {
                     $this['settings']['app'][$cfg] = function($c) use($cfg, $file, $configDir) {
-                        \Fobia\Log::debug(">> autoload config",
+                        Log::debug(">> autoload config",
                                           array($cfg, $file));
                         if ( ! file_exists($configDir . "/$file")) {
                             trigger_error("Нет автозагрузочной секции конфигурации '$cfg'" . "/$file",
                                           E_USER_ERROR);
                             return;
                         }
-                        return \Fobia\Utils::loadConfig($file);
+                        return Utils::loadConfig($file);
                     };
                 }
             }
@@ -132,7 +144,7 @@ class Application extends \Slim\App
         // Session
         $this->extend('session',
                       function($session, $c) {
-            \Fobia\Log::debug('Session start', array(session_id()));
+            Log::debug('Session start', array(session_id()));
             return $session;
         });
 

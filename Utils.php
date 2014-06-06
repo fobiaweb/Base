@@ -231,6 +231,11 @@ class Utils
         return $ip;
     }
 
+    /**
+     * Уникальный индетификатор пользователя
+     * 
+     * @return string
+     */
     public static function GetPPID()
     {
         // $ppid =  shell_exec('echo "$PPID"').PHP_EOL;

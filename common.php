@@ -12,7 +12,6 @@ if (defined('FOBIA_COMMON_FILE')) {
     return;
 }
 define('FOBIA_COMMON_FILE', true);
-\Fobia\Fobia::$env['files'][] = __FILE__;
 
 // Падавление ошибок
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT & ~E_NOTICE);

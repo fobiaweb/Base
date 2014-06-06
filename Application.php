@@ -36,6 +36,7 @@ class Application extends \Slim\App
     const MODE_TESTING     = 'testing';
     // protected static $instance = null;
 
+    protected static $instance = array();
     /**
      * @return \Fobia\Base\Application
      */
@@ -45,7 +46,7 @@ class Application extends \Slim\App
             $name = 0;
         }
 
-        $app = Fobia::$env['app'][$name];
+        $app = self::$instance[$name];
         if ( ! ($app instanceof Application)) {
             throw new \RuntimeException("Error Processing Request", 1);
         }
@@ -63,7 +64,7 @@ class Application extends \Slim\App
         if ($name === null) {
             $name = 0;
         }
-        Fobia::$env['app'][$name] = $app;
+        self::$instance[$name] = $app;
     }
 
     /**
@@ -98,7 +99,7 @@ class Application extends \Slim\App
         if (is_array($defaultSettings['import'])) {
             foreach ($defaultSettings['import'] as $file) {
                 $file     = $configDir . '/' . $file;
-                $settings = \Fobia\Utils::loadConfig($file);
+                $settings = Utils::loadConfig($file);
                 if ($settings) {
                     $defaultSettings = array_merge($defaultSettings, $settings);
                     Log::debug("Configuration import",
@@ -155,7 +156,7 @@ class Application extends \Slim\App
             \ezcDbInstance::set($db);
             return $db;
         };
-        if ( ! Fobia::$env['app'][0]) {
+        if ( ! self::$instance[0]) {
             self::setInstance($this);
         }
     }
@@ -177,18 +178,6 @@ class Application extends \Slim\App
         $url = $this->request->getUrl() . $this->config('webpath') . $url;
         return $url;
     }
-    /*
-      public function notFound($callable = null)
-      {
-      if (is_callable($callable)) {
-      parent::notFound($callable);
-      } else {
-      // $this->log->error("Not Found");
-      $this->halt(404, "Not Found");
-      // require_once $this->config('templates.path') . '/404.php';
-      }
-      }
-     */
 
     protected function defaultNotFound()
     {

@@ -10,15 +10,6 @@ namespace Fobia\Base;
 
 use \Fobia\Base\Utils;
 
-if (!class_exists('Log')) {
-    class Log {
-        public static function __callStatic($name, $arguments)
-        {
-
-        }
-     }
-}
-
 /**
  * Application class
  *

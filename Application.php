@@ -9,7 +9,6 @@
 namespace Fobia\Base;
 
 use \Fobia\Base\Utils;
-use \Fobia\Base\Fobia;
 
 if (!class_exists('Log')) {
     class Log {

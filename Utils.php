@@ -100,6 +100,7 @@ class Utils
      */
     public static function letterTrans($str)
     {
+        /*
         $rus = "абвгдежзийклмнопрстуфыэАБВГДЕЖЗИЙКЛМНОПРСТУФЫЭ";
         $eng = "abvgdegziyklmnoprstufieABVGDEGZIYKLMNOPRSTUFIE";
         $str = strtr($str, $rus, $eng);
@@ -110,29 +111,16 @@ class Utils
             'Е' => "Yo", 'Х' => "H", 'Ц' => "Ts", 'Ч' => "Ch", 'Ш' => "Sh",
             'Щ' => "Shch", 'Ъ' => '', 'Ь' => '', 'Ю' => "Yu", 'Я' => "Ya"
         ));
-    }
+        /* */
 
-    public static function userDefined(&$data, $callback)
-    {
-        if (!is_array($data) && !is_object($data)) {
-            $data = call_user_func_array($callback, array($data));
-            return $data;
-        }
+        $rus = array("ё",  "ц",  "ч",  "ш",  "щ",    "ю",  "я",  "х", 'ъ', 'ь');
+        $eng = array("yo", "ts", "ch", "sh", "shch", "yu", "ya", "h", '',  '');
+        $str = str_replace($rus, $eng, $str);
 
-        foreach ($data as $key => $value) {
-            if (is_array($value) || is_object($value)) {
-                $value = self::userDefined($value, $callback);
-            } else {
-                $value = call_user_func_array($callback, array($value));
-            }
-            if (is_object($data)) {
-                $data->$key = $value;
-            } else {
-                $data[$key] = $value;
-            }
-        }
-
-        return $data;
+        $rus = array("а", "б", "в", "г", "д", "е", "ж", "з", "и", "й", "к", "л", "м", "н", "о", "п", "р", "с", "т", "у", "ф", "ы", "э");
+        $eng = array("a", "b", "v", "g", "d", "e", "g", "z", "i", "y", "k", "l", "m", "n", "o", "p", "r", "s", "t", "u", "f", "i", "e");
+        $str = str_replace($rus, $eng, $str);
+        return $str;
     }
 
     /**
@@ -299,7 +287,7 @@ class Utils
 
     /**
      * Парсирует строку URL
-     * 
+     *
      * @param string $url
      * @param array $options
      * @return type
@@ -452,11 +440,11 @@ class Utils
 
     /**
      * Проверяет подключен ли файл
-     * 
+     *
      * @param string $file __FILE__ or markName
      * @param bool $add добавить в список подключаемых
      * @return bool TRUE если файл уже был подключен
-     */ 
+     */
     public static function isRequire($file, $add = true)
     {
         static $files = array();

@@ -241,20 +241,37 @@ class Application extends \Slim\App
      */
     public function createController($controller)
     {
-        list( $class, $methodController ) = explode(':', $controller);
-        if (!$methodController) {
-            $methodController = 'indexAction';
-        }
+        // controller.prefix
+        // controller.suffix
+        // controller.action_prefix
+        // controller.action_suffix
 
+        list( $class, $method ) = explode(':', $controller);
+
+        // Method name
+        if (!$method) {
+            $method = 'index';
+        }
+        $method =  $this['settings']['controller.action_prefix']
+            . $method
+            . $this['settings']['controller.action_suffix'];
+
+        // Class name
+        $class =  $this['settings']['controller.prefix']
+            . $class
+            . $this['settings']['controller.suffix'];
+        $class = str_replace('.', $class);
+
+        // Class arguments
         $classArgs = func_get_args();
         array_shift($classArgs);
         $app = & $this;
 
-        return function() use ($app, $classArgs, $class, $methodController ) {
+        return function() use ( $app, $classArgs, $class, $method ) {
             $methodArgs = func_get_args();
             $classController = new $class( $app, $classArgs );
-            Log::debug("Call controller: $class -> $methodController", $methodArgs);
-            return call_user_func_array(array($classController, $methodController), $methodArgs);
+            Log::debug("Call controller: $class -> $method", $methodArgs);
+            return call_user_func_array(array($classController, $method), $methodArgs);
         };
     }
 
@@ -272,9 +289,6 @@ class Application extends \Slim\App
         if (is_callable($controller)) {
             $callable = $controller;
         } else {
-            if (substr($controller, 0, 1) !== '\\') {
-                $controller = str_replace('.', '\\', $this['settings']['controller.prefix'].$controller);
-            }
             $callable = $this->createController($controller);
         }
         array_push($args, $callable);

@@ -18,11 +18,11 @@ class Utils
      */
     public static function loadConfig($file, $format = null)
     {
-        if (substr($file, 0, 1) !== '/') {
-            if (defined('CONFIG_DIR')) {
-                $file = CONFIG_DIR . '/' . $file;
-            }
-        }
+        // if (substr($file, 0, 1) !== '/') {
+        //     if (defined('CONFIG_DIR')) {
+        //         $file = CONFIG_DIR . '/' . $file;
+        //     }
+        // }
         if (!$format) {
             $format = pathinfo($file, PATHINFO_EXTENSION);
         }
@@ -59,7 +59,8 @@ class Utils
     }
 
     /**
-     * Загрузка из кешаы
+     * Загрузка из кеша
+     *
      * @param string $file
      * @param string $dir
      * @return mixed
@@ -143,20 +144,9 @@ class Utils
      */
     public static function getExecutionTime($end = null, $start = null)
     {
-        if ($start === null) {
-            $start = TIME_START;
-        }
-        if ($end === null) {
-            $end = microtime(true);
-        }
+        $start = ($start !== null) ? $start : $_SERVER["REQUEST_TIME_FLOAT"] ;
+        $end   = ($end   !== null) ? $end : microtime(true) ;
         return $end - $start;
-        // Канстанта устанавливаеться в этой библиотеке
-        // if (defined('TIME_START')) {
-        //     return microtime(true) - TIME_START;
-        // } else {
-        //     return microtime(true) - $_SERVER["REQUEST_TIME"];
-        // }
-        // return microtime(true) - TIME_START;
     }
 
     /**
@@ -216,7 +206,22 @@ class Utils
     }
 
     /**
+     * Возвращает ресурсы (время, память) в связи с запросом в виде строки.
+     *
+     * @return string
+     */
+    public static function resourceUsage()
+    {
+        $ms = self::getExecutionTime();
+        return sprintf('Memory usage: %4.2fMB (peak: %4.2fMB), time: %6.4f',
+                memory_get_usage() / 1048576,
+                memory_get_peak_usage(true) / 1048576,
+                $ms);
+    }
+
+    /**
      * IP клиента
+     *
      * @return string
      */
     public static function GetIp()
@@ -233,7 +238,7 @@ class Utils
 
     /**
      * Уникальный индетификатор пользователя
-     * 
+     *
      * @return string
      */
     public static function GetPPID()
@@ -294,6 +299,7 @@ class Utils
 
     /**
      * Парсирует строку URL
+     * 
      * @param string $url
      * @param array $options
      * @return type
@@ -425,5 +431,43 @@ class Utils
             return true;
         }
         return false;
+    }
+
+    /**
+     * Создает новый объект экземпляр класса
+     *
+     * @param string $class class name
+     * @param mixed ... arguments constructor
+     *
+     * @return mixed new class
+     */
+    public static function createClass($class) {
+        $args = func_get_args();
+        array_shift($args);
+
+        $reflectionClass = new \ReflectionClass($class);
+        $instance = $reflectionClass->newInstanceArgs($args);
+        return $instance;
+    }
+
+    /**
+     * Проверяет подключен ли файл
+     * 
+     * @param string $file __FILE__ or markName
+     * @param bool $add добавить в список подключаемых
+     * @return bool TRUE если файл уже был подключен
+     */ 
+    public static function isRequire($file, $add = true)
+    {
+        static $files = array();
+
+        if (in_array($file, $files)) {
+            return true;
+        } else {
+            if ($add) {
+                $files[] = $file;
+            }
+            return false;
+        }
     }
 }

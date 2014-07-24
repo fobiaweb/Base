@@ -63,24 +63,27 @@ abstract class Model // extends \Slim\Collection
     }
 
     /**
-     * @return \ezcDbHandler
+     * Создает запись, на основе установленых значений
+     * @return int ID новой строки
      */
-    public function getDb()
+    public function create()
     {
-        return Application::getInstance()->db;
-    }
+        $db = Application::getInstance()->db;
 
-    /**
-     *
-     * @param string $msg
-     * @param int $code
-     */
-    protected function initError($msg, $code = 1)
-    {
-        // \Fobia\Log::warning("[model.error] $code: $msg");
-        Application::getInstance()->applyHook('model.error', array($msg, $code));
-    }
+        $q = $db->createInsertQuery();
+        $q->insertInto($this->getTableName());
 
+        $keys = $this->rules();
+        foreach ($keys as $k => $v) {
+            if (isset($this->$k)) {
+                $q->set($k, $db->quote($this->$k));
+            }
+        }
+
+        $stmt = $q->prepare();
+        $stmt->execute();
+        return $db->lastInsertId();
+    }
 
     /**
      * Стичать из базы и построить объект по заданым полям (id)
@@ -130,7 +133,7 @@ abstract class Model // extends \Slim\Collection
      */
     public function update($params = null)
     {
-        $db = $this->getDb();
+        $db = Application::getInstance()->db;
         $params = (array) $params;
 
         $pkey = ($params['pkey']) ? $params['pkey'] : 'id';
@@ -173,8 +176,15 @@ abstract class Model // extends \Slim\Collection
         return $stmt->execute();
     }
 
-    // public function model()
-    // {
-    //     return new \Fobia\ActiveRowModel($this, array('pkey' => 'id'));
-    // }
+    public function toArray()
+    {
+        $array = array();
+        $keys = array_keys( $this->rules() );
+        foreach ($keys as $k) {
+            //if (isset($this->$k)) {
+                $array[$k] = $this->$k;
+            //}
+        }
+        return $array;
+    }
 }

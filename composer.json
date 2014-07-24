@@ -4,24 +4,19 @@
     "description": "Fobia Base Component",
     "license": "MIT",
     "require": {
-        "php": ">=5.3.3",
-
-        "fobiaweb/ezc-database": "1.*",
-        "fobiaweb/slim": "3.*"
+        "php": ">=5.3.3"
     },
     "autoload": {
-        "psr-0": { "Fobia\\Base\\": "" },
-        "files": [ "common.php" ]
+        "psr-0": { "Fobia\\Base\\": "" }
     },
     "suggest": {
-        "psr/log": ""
+        "psr/log": "",
+        "fobiaweb/php-helper-lib": "",
+        "fobiaweb/debug": "",
+        "fobiaweb/database": "",
+        "fobiaweb/slim": ""
     },
 
     "target-dir": "Fobia/Base",
-    "minimum-stability": "dev",
-    "extra": {
-        "branch-alias": {
-            "dev-master": "0.2-dev"
-        }
-    }
+    "minimum-stability": "dev"
 }

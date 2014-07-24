@@ -8,14 +8,15 @@
 
 namespace Fobia\Base;
 
-use \Fobia\Base\Utils;
+use Fobia\Base\Utils;
+use Fobia\Debug\Log;
 
 /**
  * Application class
  *
- * @property \ezcDbHandler $db database
+ * @property \Fobia\DataBase\Handler\MySQL $db database
  * @property \Slim\Session $session current session
- * @property \Psr\Log\LoggerInterface $log логер
+ * @property \Fobia\Auth\Authentication $auth
  *
  */
 class Application extends \Slim\App
@@ -27,6 +28,7 @@ class Application extends \Slim\App
     // protected static $instance = null;
 
     protected static $instance = array();
+
     /**
      * @return \Fobia\Base\Application
      */
@@ -46,7 +48,7 @@ class Application extends \Slim\App
     /**
      * Set Instance Application
      *
-     * @param \Fobia\Application $app
+     * @param \Fobia\Base\Application $app
      * @param string $name
      */
     public static function setInstance(Application $app, $name = null)
@@ -57,48 +59,50 @@ class Application extends \Slim\App
         self::$instance[$name] = $app;
     }
 
+    //-------------------------------------------------------------------------
+    //-------------------------------------------------------------------------
+
     /**
      * @internal
      */
     public function __construct($userSettings = null)
     {
+        $configDir = '.';
+
+        // Пользовательские настройки
+        // --------------------------
         if ( ! is_array($userSettings)) {
-            $userSettings = (array) $userSettings;
-        }
+            $file = $userSettings;
+            $userSettings = array();
+            if (file_exists($file)) {
+                $configDir = dirname($file);
 
-        $dirs = array(__DIR__ . '/../../config', __DIR__ . '/../config');
-        if (defined('CONFIG_DIR')) {
-            array_unshift($dirs, CONFIG_DIR);
-        }
-        foreach ($dirs as $dir) {
-            $f = $dir . "/config.yml";
-            if (file_exists($f)) {
-                $defaultSettings = Utils::loadConfigCache($f);
-                Log::debug("Configuration read from", array(realpath($f)));
-                break;
+                $userSettings = Utils::loadConfig($file);
+                Log::debug("Configuration load: " . realpath($file) );
+                unset($file);
             }
         }
-        if (!is_array($defaultSettings)) {
-            $defaultSettings = array();
-        }
-
-        if (is_array($userSettings)) {
-            $defaultSettings = array_replace($defaultSettings, $userSettings);
-        }
-
-        if (is_array($defaultSettings['import'])) {
-            foreach ($defaultSettings['import'] as $file) {
-                $file     = $configDir . '/' . $file;
-                $settings = Utils::loadConfig($file);
-                if ($settings) {
-                    $defaultSettings = array_merge($defaultSettings, $settings);
-                    Log::debug("Configuration import",
-                                      array(realpath($file)));
-                }
+        if ($p = $userSettings['templates.path']) {
+            if (substr($p, 0, 1) !== '/') {
+                $userSettings['templates.path'] = SYSPATH . '/' . $p;
             }
         }
 
-        parent::__construct($defaultSettings);
+        // if (is_array($userSettings['import'])) {
+        //     $import = $userSettings['import'];
+        //     foreach ($import as $file) {
+        //         $file     = $configDir . '/' . $file;
+        //         $settings = Utils::loadConfig($file);
+        //         if ($settings) {
+        //             $defaultSettings = array_merge($defaultSettings, $settings);
+        //             Log::debug("Configuration import",
+        //                               array(realpath($file)));
+        //         }
+        //     }
+        // }
+
+        parent::__construct((array) $userSettings);
+        $app = & $this;
 
         // Если Internet Explorer, то шлем на хуй
         /*
@@ -110,7 +114,7 @@ class Application extends \Slim\App
          */
 
         // // Автоматическая загрузка секций конфигурации
-        // -------------------------------------------
+        // ----------------------------------------------
         $autoload = $this['settings']['app.autoload'];
         if ($autoload) {
             $this['settings']['app']             = new \Pimple();
@@ -118,11 +122,9 @@ class Application extends \Slim\App
             if (is_array($autoload)) {
                 foreach (@$autoload as $cfg => $file) {
                     $this['settings']['app'][$cfg] = function($c) use($cfg, $file, $configDir) {
-                        Log::debug(">> autoload config",
-                                          array($cfg, $file));
+                        Log::debug(">> autoload config", array($cfg, $file));
                         if ( ! file_exists($configDir . "/$file")) {
-                            trigger_error("Нет автозагрузочной секции конфигурации '$cfg'" . "/$file",
-                                          E_USER_ERROR);
+                            trigger_error("Нет автозагрузочной секции конфигурации '$cfg'" . "/$file", E_USER_ERROR);
                             return;
                         }
                         return Utils::loadConfig($file);
@@ -130,14 +132,51 @@ class Application extends \Slim\App
                 }
             }
         }
-        unset($autoload);
+        unset($autoload, $cfg, $file);
 
         // Session
-        $this->extend('session',
-                      function($session, $c) {
-            Log::debug('Session start', array(session_id()));
+        //  session.gc_maxlifetime = 1440
+        //  ;setting session.gc_maxlifetime to 1440 (1440 seconds = 24 minutes):
+        // ------------------
+        $this['session'] = function($c) {
+            $sid = null;
+            if (@$_COOKIE['SID']) {
+                $sid = $_COOKIE['SID'];
+            }
+            if ($sid) {
+                session_id($sid);
+            }
+            $session = new \Slim\Session($c['settings']['session.handler']);
+            $session->start();
+            if ($c['settings']['session.encrypt'] === true) {
+                $session->decrypt($c['crypt']);
+            }
+            if ($sid === null) {
+                $sid =  session_id();
+                $c->setCookie('SID', $sid, time() + 1440);
+                Log::debug('Session save cookie');
+            }
+
+            Log::debug('Session start', array($sid));
+
             return $session;
-        });
+        };
+
+        // View
+        // ------------------
+        $this['view'] = function($c) {
+            $view = $c['settings']['view'];
+            if ($view instanceof \Slim\Interfaces\ViewInterface !== false) {
+                return $view;
+            }
+
+            $view = new \Slim\Views\Smarty($c['settings']['templates.path']);
+            $view->parserExtensions       = SRC_DIR . '/src/Slim/Views/SmartyPlugins';
+            $view->parserCompileDirectory = CACHE_DIR . '/templates';
+            $view->parserCacheDirectory   = CACHE_DIR ;
+
+            return $view;
+        };
 
         // Database
         // ------------------
@@ -146,6 +185,26 @@ class Application extends \Slim\App
             \ezcDbInstance::set($db);
             return $db;
         };
+
+        // Auth
+        // ------------------
+        $this['auth'] = function($c) use($app) {
+            $auth = new \Fobia\Auth\Authentication($app);
+            $auth->authenticate();
+            return $auth;
+        };
+
+        // API
+        // ------------------
+        $this['apiHandler'] = function() {
+            return new \Api\ApiHandler();
+        };
+        $this['api'] = $this->protect(function($method, $params = null) use ($app)  {
+            $result = $app['apiHandler']->request($method, $params);
+            return $result;
+        });
+
+        // ------------------
         if ( ! self::$instance[0]) {
             self::setInstance($this);
         }
@@ -160,29 +219,140 @@ class Application extends \Slim\App
     }
 
     /**
-     * Корневой путь приложухи (из конфига webpath)
-     * @return string
+     * Хеширование строки по настройкам приложухи
+     *
+     * @param string $value   строка для хеширования
+     * @return string  хешированая строка
      */
-    public function getWebPath($url = null)
+    public function hash($value)
     {
-        $url = $this->request->getUrl() . $this->config('webpath') . $url;
-        return $url;
+        return  hash_hmac(
+                    $this['settings']['crypt.method'],
+                    $value,
+                    $this['settings']['crypt.key']
+        );
     }
 
-    protected function defaultNotFound()
+    /**
+     * Возвращает функцию автозоздания контролера
+     *
+     * @param string $controller
+     * @return callable
+     */
+    public function createController($controller)
     {
-        $this->halt(404, "Not Found");
+        list( $class, $methodController ) = explode(':', $controller);
+        if (!$methodController) {
+            $methodController = 'indexAction';
+        }
+
+        $classArgs = func_get_args();
+        array_shift($classArgs);
+        $app = & $this;
+
+        return function() use ($app, $classArgs, $class, $methodController ) {
+            $methodArgs = func_get_args();
+            $classController = new $class( $app, $classArgs );
+            Log::debug("Call controller: $class -> $methodController", $methodArgs);
+            return call_user_func_array(array($classController, $methodController), $methodArgs);
+        };
     }
 
-    // protected function defaultError($e)
-    // {
-    //     $this->contentType('text/html');
-    //     dump($e);
-    // }
+    /**
+     * Добавить маршрут без метода HTTP
+     *
+     * @param string  $path   маршрут
+     * @param string|callable $controller карта контроллера или функция
+     * @return \Slim\Route
+     */
+    public function route($path, $controller)
+    {
+        $args = func_get_args();
+        $controller = array_pop($args);
+        if (is_callable($controller)) {
+            $callable = $controller;
+        } else {
+            if (substr($controller, 0, 1) !== '\\') {
+                $controller = str_replace('.', '\\', $this['settings']['controller.prefix'].$controller);
+            }
+            $callable = $this->createController($controller);
+        }
+        array_push($args, $callable);
+        return call_user_func_array(array($this, 'map'), $args);
+    }
+
 
     public function isCli()
     {
         defined('IS_CLI') or define('IS_CLI',  ! defined('SYSPATH'));
         return IS_CLI;
     }
+
+    /**
+     * Базовый url путь
+     *
+     * @param string  $url
+     * @return string
+     */
+    public function urlForBase($url = '')
+    {
+        $url = $this->urlFor('base') . $url;
+        return preg_replace('|/+|', '/', $url);
+    }
+
+    /* ***********************************************
+     * OVERRIDE
+     * ********************************************** */
+
+    /**
+     *
+     */
+    protected function defaultNotFound()
+    {
+        $this->status(404);
+        $view = new \Slim\View($this->config('templates.path'));
+        $view->display('error/404.php');
+    }
+
+    protected function defaultError($e)
+    {
+        $this->status(500);
+        $view = new \Slim\View($this->config('templates.path'));
+        $view->display('error/500.php');
+        echo $e->xdebug_message;
+       //parent::defaultError($e);
+    }
+
+    protected function dispatchRequest(\Slim\Http\Request $request, \Slim\Http\Response $response)
+    {
+        Log::debug('App run dispatch request');
+        try {
+            $this->applyHook('slim.before');
+            ob_start();
+            $this->applyHook('slim.before.router');
+            $dispatched = false;
+            $matchedRoutes = $this['router']->getMatchedRoutes($request->getMethod(), $request->getPathInfo(), true);
+            foreach ($matchedRoutes as $route) {
+                /* @var $route \Slim\Route */
+                try {
+                    $this->applyHook('slim.before.dispatch');
+                    $dispatched = $route->dispatch();
+                    $this->applyHook('slim.after.dispatch');
+                    if ($dispatched) {
+                        Log::debug('Route dispatched: ' . $route->getPattern());
+                        break;
+                    }
+                } catch (\Slim\Exception\Pass $e) {
+                    continue;
+                }
+            }
+            if (!$dispatched) {
+                $this->notFound();
+            }
+            $this->applyHook('slim.after.router');
+        } catch (\Slim\Exception\Stop $e) {}
+        $response->write(ob_get_clean());
+        $this->applyHook('slim.after');
+    }
+
 }

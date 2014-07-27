@@ -260,7 +260,7 @@ class Application extends \Slim\App
         $class =  $this['settings']['controller.prefix']
             . $class
             . $this['settings']['controller.suffix'];
-        $class = str_replace('.', $class);
+        $class = str_replace('.', '_', $class);
 
         // Class arguments
         $classArgs = func_get_args();

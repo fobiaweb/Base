@@ -26,6 +26,8 @@ abstract class Model // extends \Slim\Collection
             foreach ($data as $k => $v ) {
                 $this->$k = $v;
             }
+        } elseif (is_int($data) && $this->rules('id')) {
+            $this->id = $data;
         }
     }
 

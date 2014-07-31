@@ -59,6 +59,38 @@ class Application extends \Slim\App
         self::$instance[$name] = $app;
     }
 
+
+    protected $defaultsSettings = array(
+        // Application
+        'mode' => 'development',
+        'view' => null,
+        // Cookies
+        'cookies.encrypt' => false,
+        'cookies.lifetime' => '20 minutes',
+        'cookies.path' => '/',
+        'cookies.domain' => null,
+        'cookies.secure' => false,
+        'cookies.httponly' => false,
+        // Encryption
+        'crypt.key' => 'A9s_lWeIn7cML8M]S6Xg4aR^GwovA&UN',
+        'crypt.cipher' => MCRYPT_RIJNDAEL_256,
+        'crypt.mode' => MCRYPT_MODE_CBC,
+        // Session
+        'session.handler' => null,
+        'session.flash_key' => 'slimflash',
+        'session.encrypt' => false,
+        'session.cookie'  => true,
+        // HTTP
+        'http.version' => '1.1',
+        // Routing
+        'routes.case_sensitive' => true,
+        // Controller
+        'controller.prefix' => '\\Controller\\',
+        'controller.suffix' => '',
+        'controller.action_prefix' => '',
+        'controller.action_suffix' => '',
+    );
+
     //-------------------------------------------------------------------------
     //-------------------------------------------------------------------------
 
@@ -82,6 +114,8 @@ class Application extends \Slim\App
                 unset($file);
             }
         }
+        $userSettings = array_merge($this->defaultsSettings, $userSettings);
+
         if ($p = $userSettings['templates.path']) {
             if (substr($p, 0, 1) !== '/') {
                 $userSettings['templates.path'] = SYSPATH . '/' . $p;
@@ -140,21 +174,23 @@ class Application extends \Slim\App
         // ------------------
         $this['session'] = function($c) {
             $sid = null;
-            if (@$_COOKIE['SID']) {
+            if ($c['settings']['session.cookie'] && @$_COOKIE['SID']) {
                 $sid = $_COOKIE['SID'];
-            }
-            if ($sid) {
                 session_id($sid);
             }
+
             $session = new \Slim\Session($c['settings']['session.handler']);
             $session->start();
             if ($c['settings']['session.encrypt'] === true) {
                 $session->decrypt($c['crypt']);
             }
+
             if ($sid === null) {
                 $sid =  session_id();
-                $c->setCookie('SID', $sid, time() + 1440);
-                Log::debug('Session save cookie');
+                if ($c['settings']['session.cookie']) {
+                    $c->setCookie('SID', $sid, time() + 1440);
+                    Log::debug('Session save cookie');
+                }
             }
 
             Log::debug('Session start', array($sid));
@@ -196,13 +232,13 @@ class Application extends \Slim\App
 
         // API
         // ------------------
-        $this['apiHandler'] = function() {
-            return new \Api\ApiHandler();
-        };
-        $this['api'] = $this->protect(function($method, $params = null) use ($app)  {
-            $result = $app['apiHandler']->request($method, $params);
-            return $result;
-        });
+        // $this['apiHandler'] = function() {
+        //     return new \Api\ApiHandler();
+        // };
+        // $this['api'] = $this->protect(function($method, $params = null) use ($app)  {
+        //     $result = $app['apiHandler']->request($method, $params);
+        //     return $result;
+        // });
 
         // ------------------
         if ( ! self::$instance[0]) {

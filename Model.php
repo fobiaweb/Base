@@ -75,8 +75,8 @@ abstract class Model // extends \Slim\Collection
         $q = $db->createInsertQuery();
         $q->insertInto($this->getTableName());
 
-        $keys = $this->rules();
-        foreach ($keys as $k => $v) {
+        $keys = array_keys( $this->rules() );
+        foreach ($keys as $k) {
             if (isset($this->$k)) {
                 $q->set($k, $db->quote($this->$k));
             }
@@ -101,7 +101,7 @@ abstract class Model // extends \Slim\Collection
         $q->select('*')->from($this->getTableName());
 
         $column = 'id';
-        $value = $this->id;
+        $value = $this->$column;
 
         if ($data) {
             if (is_array($data)) {
@@ -129,6 +129,9 @@ abstract class Model // extends \Slim\Collection
     }
 
     /**
+     * $params
+     *   pkey  - primary key (имя первичного ключа)
+     *   id    - значение первичного ключа
      *
      * @param array $params
      * @return boolean
@@ -139,15 +142,16 @@ abstract class Model // extends \Slim\Collection
         $params = (array) $params;
 
         $pkey = ($params['pkey']) ? $params['pkey'] : 'id';
-        $id = ($params['id']) ? $params['id'] : $this->$pkey;
+        $id   = ($params['id'])   ? $params['id'] : $this->$pkey;
 
         $q = $db->createUpdateQuery();
         $q->update($this->getTableName());
 
         $keys = $this->rules();
         unset($keys[$pkey]);
+        $keys = array_keys($keys);
 
-        foreach ($keys as $k=>$v) {
+        foreach ($keys as $k) {
             if (isset($this->$k)) {
                 $q->set($k, $db->quote($this->$k));
             }
@@ -159,13 +163,16 @@ abstract class Model // extends \Slim\Collection
     }
 
     /**
+     * params:
+     *   pkey  - primary key (имя первичного ключа)
+     *   id    - значение первичного ключа
      *
      * @param array $params
      * @return boolean
      */
     public function delete($params = null)
     {
-        $db = $this->getDb();
+        $db = Application::getInstance()->db;
         $params = (array) $params;
 
         $pkey = ($params['pkey']) ? $params['pkey'] : 'id';
@@ -178,14 +185,16 @@ abstract class Model // extends \Slim\Collection
         return $stmt->execute();
     }
 
+    /**
+     *
+     * @return array
+     */
     public function toArray()
     {
         $array = array();
         $keys = array_keys( $this->rules() );
         foreach ($keys as $k) {
-            //if (isset($this->$k)) {
-                $array[$k] = $this->$k;
-            //}
+            $array[$k] = $this->$k;
         }
         return $array;
     }

@@ -295,7 +295,10 @@ class Application extends \Slim\App
         return call_user_func_array(array($this, 'map'), $args);
     }
 
-
+    /**
+     *
+     * @return boolean
+     */
     public function isCli()
     {
         defined('IS_CLI') or define('IS_CLI',  ! defined('SYSPATH'));

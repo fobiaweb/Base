@@ -373,7 +373,20 @@ class Application extends \Slim\App
         $view = new \Slim\View($this->config('templates.path'));
         $view->display('error/500.php');
         echo $e->xdebug_message;
-       //parent::defaultError($e);
+        //parent::defaultError($e);
+        //
+        
+            if ($e instanceof \Exception) {
+                $code = $e->getCode();
+                $message = $e->getMessage();
+                $file = $e->getFile();
+                $line = $e->getLine();
+                $trace = str_replace(array('#', '\n'), array('<div>#', '</div>'), $e->getTraceAsString());
+
+                $text = $code . "\n" . $message. "\n" . "$file :: $line\n" . $trace;
+                $file = LOGS_DIR . '/error_app.log';
+                file_put_contents($file, $text, FILE_APPEND);
+            }
     }
 
     protected function dispatchRequest(\Slim\Http\Request $request, \Slim\Http\Response $response)

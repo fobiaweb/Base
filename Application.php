@@ -180,7 +180,7 @@ class Application extends \Slim\App
             }
 
             $session = new \Slim\Session($c['settings']['session.handler']);
-            $session->start();
+            @$session->start();
             if ($c['settings']['session.encrypt'] === true) {
                 $session->decrypt($c['crypt']);
             }
@@ -188,7 +188,7 @@ class Application extends \Slim\App
             if ($sid === null) {
                 $sid =  session_id();
                 if ($c['settings']['session.cookie']) {
-                    $c->setCookie('SID', $sid, time() + 1440);
+                    @$c->setCookie('SID', $sid, time() + 1440);
                     Log::debug('Session save cookie');
                 }
             }

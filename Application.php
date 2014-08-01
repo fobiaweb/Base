@@ -104,14 +104,18 @@ class Application extends \Slim\App
         // Пользовательские настройки
         // --------------------------
         if ( ! is_array($userSettings)) {
-            $file = $userSettings;
-            $userSettings = array();
+            $userSettings = array('file' => $userSettings);
+        }
+        if ($file = @$userSettings['file']) {
+            unset($userSettings['file']);
             if (file_exists($file)) {
                 $configDir = dirname($file);
 
-                $userSettings = Utils::loadConfig($file);
+                $settings = Utils::loadConfig($file);
                 Log::debug("Configuration load: " . realpath($file) );
                 unset($file);
+
+                $userSettings = array_merge($userSettings, $settings);
             }
         }
         $userSettings = array_merge($this->defaultsSettings, $userSettings);

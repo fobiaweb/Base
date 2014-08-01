@@ -17,8 +17,12 @@ use \Fobia\Base\Application;
  */
 abstract class Model // extends \Slim\Collection
 {
-    /** @var array */
+    /** 
+     * // array(type, dbType, null, default)
+     * @var array
+     */
     static protected $_rules = array();
+    static protected $_primaryKey = 'id';
 
     public function __construct($data = null)
     {
@@ -26,13 +30,21 @@ abstract class Model // extends \Slim\Collection
             foreach ($data as $k => $v ) {
                 $this->$k = $v;
             }
-        } elseif (is_int($data) && $this->rules('id')) {
-            $this->id = $data;
+        } elseif (is_int($data) && $this->rules($this->getPrimaryKey())) {
+            $pri = $this->getPrimaryKey();
+            $this->$pri = $data;
         }
     }
 
     /**
      * Возвращает правело для параметра
+     *
+     * Params:
+     *   [0] - type    - тип данных
+     *   [1] - dbType  - тип данных в MySQL
+     *   [2] - null,   - принимает значение NULL
+     *   [3] - default - значение по умолчанию
+     *
      *
      * @param string $name имя параметра
      * @return string|array
@@ -41,6 +53,12 @@ abstract class Model // extends \Slim\Collection
     {
         $class = get_class($this);
         return ($name !== null) ? $class::$_rules[$name] : $class::$_rules;
+    }
+
+    public function getPrimaryKey()
+    {
+        $class = get_class($this);
+        return $class::$_primaryKey;
     }
 
     /**
@@ -100,7 +118,7 @@ abstract class Model // extends \Slim\Collection
         $q = $db->createSelectQuery();
         $q->select('*')->from($this->getTableName());
 
-        $column = 'id';
+        $column = $this->getPrimaryKey();
         $value = $this->$column;
 
         if ($data) {
@@ -141,7 +159,7 @@ abstract class Model // extends \Slim\Collection
         $db = Application::getInstance()->db;
         $params = (array) $params;
 
-        $pkey = ($params['pkey']) ? $params['pkey'] : 'id';
+        $pkey = ($params['pkey']) ? $params['pkey'] : $this->getPrimaryKey();
         $id   = ($params['id'])   ? $params['id'] : $this->$pkey;
 
         $q = $db->createUpdateQuery();
@@ -175,7 +193,7 @@ abstract class Model // extends \Slim\Collection
         $db = Application::getInstance()->db;
         $params = (array) $params;
 
-        $pkey = ($params['pkey']) ? $params['pkey'] : 'id';
+        $pkey = ($params['pkey']) ? $params['pkey'] : $this->getPrimaryKey();
         $id = ($params['id']) ? $params['id'] : $this->$pkey;
 
         $q = $db->createDeleteQuery();

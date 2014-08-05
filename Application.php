@@ -16,7 +16,7 @@ use Fobia\Debug\Log;
  *
  * @property \Fobia\DataBase\Handler\MySQL $db database
  * @property \Slim\Session $session current session
- * @property \Fobia\Auth\Authentication $auth
+ * @property \Fobia\Auth\BaseAuthentication $auth
  *
  */
 class Application extends \Slim\App
@@ -99,22 +99,35 @@ class Application extends \Slim\App
      */
     public function __construct($userSettings = null)
     {
-        $configDir = '.';
+        defined('SYSPATH') or trigger_error("Не определена константа 'SYSPATH'.", E_USER_WARNING);
+        defined('SRC_DIR') or trigger_error("Не определена константа 'SRC_DIR'.", E_USER_WARNING);
+        defined('HTML_DIR') or trigger_error("Не определена константа 'HTML_DIR'.", E_USER_WARNING);
+        defined('LOGS_DIR') or trigger_error("Не определена константа 'LOGS_DIR'.", E_USER_WARNING);
+        defined('CACHE_DIR') or trigger_error("Не определена константа 'CACHE_DIR'.", E_USER_WARNING);
+        defined('CONFIG_DIR') or trigger_error("Не определена константа 'CONFIG_DIR'.", E_USER_WARNING);
 
         // Пользовательские настройки
         // --------------------------
         if ( ! is_array($userSettings)) {
-            $file = $userSettings;
-            $userSettings = array();
-            if (file_exists($file)) {
-                $configDir = dirname($file);
-
-                $userSettings = Utils::loadConfig($file);
-                Log::debug("Configuration load: " . realpath($file) );
-                unset($file);
+            $userSettings = array('file' => $userSettings);
+        }
+        if ($fileList = @$userSettings['file']) {
+            $fileList = (array) $fileList;
+            $loadSettings = array();
+            foreach ($fileList as $file) {
+                if (file_exists($file)) {
+                    $settings = Utils::loadConfig($file);
+                    $loadSettings = array_merge($loadSettings, $settings);
+                    Log::debug("Configuration load: " . realpath($file) );
+                }
             }
+            unset($userSettings['file'], $fileList, $file);
+            $userSettings = array_merge($loadSettings, $userSettings);
         }
         $userSettings = array_merge($this->defaultsSettings, $userSettings);
+
+        Log::getLogger()->level = $userSettings['log.level'] ;
+        Log::getLogger()->enableRender = $userSettings['log.enabled'] ;
 
         if ($p = $userSettings['templates.path']) {
             if (substr($p, 0, 1) !== '/') {
@@ -168,6 +181,12 @@ class Application extends \Slim\App
         }
         unset($autoload, $cfg, $file);
 
+        //$this['settings']['autoload'] = function($c) {
+            $config = new AutoloadConfig(CONFIG_DIR);
+            $config->setKeys($this['settings']['app']['autoload']);
+            $this['settings']['autoload'] =  $config;
+        //};
+
         // Session
         //  session.gc_maxlifetime = 1440
         //  ;setting session.gc_maxlifetime to 1440 (1440 seconds = 24 minutes):
@@ -180,7 +199,7 @@ class Application extends \Slim\App
             }
 
             $session = new \Slim\Session($c['settings']['session.handler']);
-            $session->start();
+            @$session->start();
             if ($c['settings']['session.encrypt'] === true) {
                 $session->decrypt($c['crypt']);
             }
@@ -189,11 +208,11 @@ class Application extends \Slim\App
                 $sid =  session_id();
                 if ($c['settings']['session.cookie']) {
                     $c->setCookie('SID', $sid, time() + 1440);
-                    Log::debug('Session save cookie');
+                    Log::debug("save the session in a cookie 'SID'");
                 }
             }
 
-            Log::debug('Session start', array($sid));
+            Log::info('Session start', array($sid));
 
             return $session;
         };
@@ -225,7 +244,7 @@ class Application extends \Slim\App
         // Auth
         // ------------------
         $this['auth'] = function($c) use($app) {
-            $auth = new \Fobia\Auth\Authentication($app);
+            $auth = new \Fobia\Auth\BaseAuthentication($app);
             $auth->authenticate();
             return $auth;
         };
@@ -293,14 +312,14 @@ class Application extends \Slim\App
             . $this['settings']['controller.action_suffix'];
 
         // Class name
-        $class =  $this['settings']['controller.prefix']
-            . $class
-            . $this['settings']['controller.suffix'];
+        if (substr($class, 0, 1) != '\\') {
+            $class =  $this['settings']['controller.prefix']. $class;
+        }
+        $class .= $this['settings']['controller.suffix'];
         $class = str_replace('.', '_', $class);
 
         // Class arguments
-        $classArgs = func_get_args();
-        array_shift($classArgs);
+        $classArgs = array_slice(func_get_args(), 1);
         $app = & $this;
 
         return function() use ( $app, $classArgs, $class, $method ) {
@@ -360,6 +379,17 @@ class Application extends \Slim\App
     /**
      *
      */
+    protected function mapRoute($args)
+    {
+        $callable = array_pop($args);
+        if (!is_callable($callable)) {
+            $callable = $this->createController($callable);
+        }
+        array_push($args, $callable);
+        return parent::mapRoute($args);
+    }
+    
+    
     protected function defaultNotFound()
     {
         $this->status(404);
@@ -373,7 +403,21 @@ class Application extends \Slim\App
         $view = new \Slim\View($this->config('templates.path'));
         $view->display('error/500.php');
         echo $e->xdebug_message;
-       //parent::defaultError($e);
+        //parent::defaultError($e);
+        //
+
+        $text = date("[Y-m-d H:i:s] ") ;
+
+        if ($e instanceof \Exception) {
+            $text .= "Error " . $e->getCode() . ". " . $e->getMessage() . "\n"
+                . $e->getFile() . "(" . $e->getLine() . ")\n"
+                . $e->getTraceAsString() . "\n";
+        } else {
+            $text .= sprintf('Error %s', $e);
+        }
+
+        $file = LOGS_DIR . '/error_app.log';
+        file_put_contents($file, $text, FILE_APPEND);
     }
 
     protected function dispatchRequest(\Slim\Http\Request $request, \Slim\Http\Response $response)
@@ -386,6 +430,7 @@ class Application extends \Slim\App
             $dispatched = false;
             $matchedRoutes = $this['router']->getMatchedRoutes($request->getMethod(), $request->getPathInfo(), true);
             foreach ($matchedRoutes as $route) {
+                // dump($matchedRoutes);
                 /* @var $route \Slim\Route */
                 try {
                     $this->applyHook('slim.before.dispatch');
@@ -407,5 +452,23 @@ class Application extends \Slim\App
         $response->write(ob_get_clean());
         $this->applyHook('slim.after');
     }
+
+    public function clearRouter()
+    {
+        $routeArr = $app['router']->getNamedRoutes();
+        unset($app['router']);
+        $app['router'] = function ($c) {
+            return new \Slim\Router();
+        };
+        foreach ($routeArr as $route) {
+            $app['router']->map($route);
+        }
+    }
+
+    /////////////////////
+
+
+
+
 
 }

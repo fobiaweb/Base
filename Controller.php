@@ -32,10 +32,8 @@ class Controller
         if ($section === null || !method_exists($this, $section) ) {
             $this->app->notFound();
         }
-        
-        $args = func_get_args();
-        array_shift($args);
 
+        $args = array_slice(func_get_args(), 1);
         dispatchMethod($this, $section, $args);
     }
 

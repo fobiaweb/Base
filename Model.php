@@ -55,6 +55,11 @@ abstract class Model // extends \Slim\Collection
         return ($name !== null) ? $class::$_rules[$name] : $class::$_rules;
     }
 
+    /**
+     * Название первичного ключа
+     *
+     * @return string
+     */
     public function getPrimaryKey()
     {
         $class = get_class($this);
@@ -101,8 +106,10 @@ abstract class Model // extends \Slim\Collection
         }
 
         $stmt = $q->prepare();
-        $stmt->execute();
-        return $db->lastInsertId();
+        if ($stmt->execute()) {
+            return $db->lastInsertId();
+        }
+        return false;
     }
 
     /**
@@ -119,7 +126,7 @@ abstract class Model // extends \Slim\Collection
         $q->select('*')->from($this->getTableName());
 
         $column = $this->getPrimaryKey();
-        $value = $this->$column;
+        $value  = $this->$column;
 
         if ($data) {
             if (is_array($data)) {
@@ -130,13 +137,15 @@ abstract class Model // extends \Slim\Collection
                 $value = $data;
                 $q->where($q->expr->eq($column, $db->quote($value)));
             }
-        } else {
+        } elseif (isset ($value) && isset ($column)) {
             $q->where($q->expr->eq($column, $db->quote($value)));
+        } else {
+            return false;
         }
 
         $stmt = $q->prepare();
         if ($stmt->execute()) {
-            if ($result = $stmt->fetch()) {
+            if ($result = $stmt->fetch(\PDO::FETCH_ASSOC)) {
                 foreach ($result as $k => $v) {
                     $this->$k = $v;
                 }
@@ -160,7 +169,7 @@ abstract class Model // extends \Slim\Collection
         $params = (array) $params;
 
         $pkey = ($params['pkey']) ? $params['pkey'] : $this->getPrimaryKey();
-        $id   = ($params['id'])   ? $params['id'] : $this->$pkey;
+        $id   = ($params['id'])   ? $params['id']   : $this->$pkey;
 
         $q = $db->createUpdateQuery();
         $q->update($this->getTableName());
@@ -194,7 +203,7 @@ abstract class Model // extends \Slim\Collection
         $params = (array) $params;
 
         $pkey = ($params['pkey']) ? $params['pkey'] : $this->getPrimaryKey();
-        $id = ($params['id']) ? $params['id'] : $this->$pkey;
+        $id   = ($params['id'])   ? $params['id']   : $this->$pkey;
 
         $q = $db->createDeleteQuery();
         $q->deleteFrom($this->getTableName());
